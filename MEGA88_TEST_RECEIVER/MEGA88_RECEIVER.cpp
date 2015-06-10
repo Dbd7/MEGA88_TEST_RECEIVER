@@ -17,14 +17,9 @@
 #ifdef __AVR_ATmega88A__
 #endif
 
-uint8_t readFromNRF(uint8_t reg){
-	PORTB &= (~(1<<2));
-	WriteByteSPI( reg );
-	uint8_t result = WriteByteSPI(0xff);
-
-	PORTB |= ((1<<2));
-	return result;
-}
+volatile uint8_t receiveBuffer[32];
+//ce, cs
+RF24 radio(1,2);
 
 //Activated on falling edge.
 void enableInt1( void ){
@@ -41,6 +36,13 @@ void enableInt1( void ){
 
 ISR(INT1_vect){
 	USART_sendString("int\n\r");
+	if(radio.available()){
+		USART_sendString("Data available!\n\r");
+		radio.read((uint8_t*)receiveBuffer, 1);
+		USART_sendString("Received: ");
+		USART_SendByte((uint8_t)receiveBuffer[0]);
+		USART_sendString("\n\r");
+	}
 }
 
 int main(void)
@@ -64,8 +66,6 @@ int main(void)
 	// Single radio pipe address for the 2 nodes to communicate.
 	const uint64_t pipe = 0xE8E8F0F0E1LL;
 	
-	//ce, cs
-	RF24 radio(1,2);
 
 	PORTB |= (1<<DDB0);
 	
@@ -124,16 +124,6 @@ int main(void)
 			radio.read_register(RX_ADDR_P1, buff, 5);
 			USART_sendHexArray(buff,5);
 			USART_sendString("\n\r");
-			while(1){
-				if(radio.available()){
-					USART_sendString("Data available!\n\r");
-					radio.read(buff, 1);
-					USART_sendString("Received: ");
-					USART_SendByte(buff[0]);
-					USART_sendString("\n\r");
-					break;
-				}
-			}
 		}
 		else if(command=='R'){
 			USART_sendString("Read which register? ");
